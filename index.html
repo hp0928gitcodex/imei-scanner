@@ -1,0 +1,1040 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#fbf5ea">
+  <title>IMEI Scanner</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #fbf5ea;
+      --bg-accent: #f3e2c7;
+      --panel: rgba(255, 250, 242, 0.84);
+      --panel-strong: #fffaf3;
+      --text: #1b2230;
+      --muted: #5b6474;
+      --line: rgba(27, 34, 48, 0.12);
+      --accent: #ff6f3d;
+      --accent-deep: #d44a1f;
+      --accent-soft: rgba(255, 111, 61, 0.14);
+      --success: #1b8f5a;
+      --warning: #bd6d00;
+      --danger: #bf2f3c;
+      --shadow: 0 24px 60px rgba(51, 36, 18, 0.14);
+      --radius-xl: 28px;
+      --radius-lg: 20px;
+      --radius-md: 16px;
+      --safe-top: max(20px, env(safe-area-inset-top));
+      --safe-bottom: max(20px, env(safe-area-inset-bottom));
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      margin: 0;
+      min-height: 100%;
+    }
+
+    body {
+      min-height: 100svh;
+      font-family: "Avenir Next", "Segoe UI", "Helvetica Neue", sans-serif;
+      color: var(--text);
+      background:
+        radial-gradient(circle at top left, rgba(255, 111, 61, 0.28), transparent 30%),
+        radial-gradient(circle at bottom right, rgba(255, 190, 92, 0.24), transparent 36%),
+        linear-gradient(160deg, var(--bg) 0%, #f7efe2 48%, #f9f7f2 100%);
+    }
+
+    .app-shell {
+      width: min(100%, 430px);
+      margin: 0 auto;
+      padding:
+        calc(var(--safe-top) + 8px)
+        16px
+        calc(var(--safe-bottom) + 18px);
+      animation: rise-in 320ms ease-out;
+    }
+
+    .card {
+      position: relative;
+      overflow: hidden;
+      background: var(--panel);
+      backdrop-filter: blur(20px);
+      border: 1px solid rgba(255, 255, 255, 0.7);
+      border-radius: var(--radius-xl);
+      box-shadow: var(--shadow);
+    }
+
+    .hero {
+      padding: 22px 20px 18px;
+      margin-bottom: 14px;
+      background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.62), rgba(255, 250, 242, 0.9)),
+        linear-gradient(135deg, rgba(255, 111, 61, 0.16), rgba(255, 193, 120, 0.08));
+    }
+
+    .hero::after {
+      content: "";
+      position: absolute;
+      inset: auto -20px -50px auto;
+      width: 130px;
+      height: 130px;
+      border-radius: 999px;
+      background: linear-gradient(135deg, rgba(255, 111, 61, 0.16), rgba(255, 183, 79, 0.04));
+    }
+
+    .eyebrow {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 12px;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.72);
+      border: 1px solid rgba(255, 111, 61, 0.14);
+      color: var(--accent-deep);
+      font-size: 0.78rem;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+
+    .eyebrow::before {
+      content: "";
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--accent);
+      box-shadow: 0 0 0 6px rgba(255, 111, 61, 0.14);
+    }
+
+    .hero-topline {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .version-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 12px;
+      border-radius: 999px;
+      background: rgba(27, 34, 48, 0.94);
+      color: #fffdf8;
+      font-size: 0.82rem;
+      font-weight: 800;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+
+    .version-chip::before {
+      content: "";
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #8fffbe;
+      box-shadow: 0 0 0 6px rgba(143, 255, 190, 0.12);
+    }
+
+    h1 {
+      margin: 16px 0 8px;
+      font-size: clamp(2rem, 6vw, 2.6rem);
+      line-height: 0.95;
+      letter-spacing: -0.04em;
+    }
+
+    .subtitle {
+      margin: 0;
+      max-width: 28ch;
+      color: var(--muted);
+      font-size: 0.98rem;
+      line-height: 1.45;
+    }
+
+    .counter {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 12px;
+      margin-top: 18px;
+      padding: 14px 16px;
+      border-radius: var(--radius-lg);
+      background: rgba(27, 34, 48, 0.95);
+      color: #fffdf8;
+    }
+
+    .counter-label {
+      font-size: 0.88rem;
+      letter-spacing: 0.03em;
+      text-transform: uppercase;
+      opacity: 0.74;
+    }
+
+    .counter-value {
+      font-size: 2.15rem;
+      font-weight: 800;
+      line-height: 1;
+      letter-spacing: -0.06em;
+    }
+
+    .counter-unit {
+      font-size: 0.95rem;
+      font-weight: 600;
+      opacity: 0.72;
+    }
+
+    .controls,
+    .panel {
+      padding: 16px;
+      margin-bottom: 14px;
+    }
+
+    .controls-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+    }
+
+    button.wide {
+      grid-column: 1 / -1;
+    }
+
+    button {
+      appearance: none;
+      border: 0;
+      border-radius: 18px;
+      padding: 15px 14px;
+      font: inherit;
+      font-weight: 700;
+      color: var(--text);
+      background: #ffffff;
+      box-shadow: inset 0 0 0 1px rgba(27, 34, 48, 0.08);
+      transition: transform 180ms ease, background-color 180ms ease, opacity 180ms ease;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    button:active {
+      transform: scale(0.985);
+    }
+
+    button.primary {
+      background: linear-gradient(180deg, #ff8958 0%, var(--accent) 100%);
+      color: #fffdf9;
+      box-shadow: 0 16px 24px rgba(212, 74, 31, 0.22);
+    }
+
+    button.secondary {
+      background: linear-gradient(180deg, #2f3848 0%, #1f2736 100%);
+      color: #fffdf8;
+    }
+
+    button.utility {
+      background: var(--panel-strong);
+    }
+
+    button:disabled {
+      opacity: 0.42;
+      transform: none;
+      box-shadow: inset 0 0 0 1px rgba(27, 34, 48, 0.06);
+    }
+
+    .panel-heading {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin-bottom: 12px;
+    }
+
+    .panel-title {
+      margin: 0;
+      font-size: 1rem;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+    }
+
+    .panel-note {
+      color: var(--muted);
+      font-size: 0.82rem;
+    }
+
+    .close-camera {
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 10px 14px;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.12);
+      color: #fffdf8;
+      box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.12);
+    }
+
+    .scanner-wrap {
+      position: relative;
+      overflow: hidden;
+      min-height: 256px;
+      border-radius: 24px;
+      border: 1px solid rgba(27, 34, 48, 0.08);
+      background:
+        linear-gradient(180deg, rgba(27, 34, 48, 0.02), rgba(27, 34, 48, 0.08)),
+        repeating-linear-gradient(
+          180deg,
+          rgba(27, 34, 48, 0.015),
+          rgba(27, 34, 48, 0.015) 2px,
+          transparent 2px,
+          transparent 10px
+        ),
+        linear-gradient(135deg, rgba(255, 111, 61, 0.12), rgba(255, 255, 255, 0.6));
+    }
+
+    #reader {
+      width: 100%;
+      min-height: 256px;
+    }
+
+    #reader video {
+      border-radius: 24px;
+      object-fit: cover;
+    }
+
+    .status {
+      margin-top: 14px;
+      padding: 12px 14px;
+      border-radius: 16px;
+      background: rgba(27, 34, 48, 0.06);
+      color: var(--text);
+      font-size: 0.95rem;
+      line-height: 1.35;
+    }
+
+    .status.success {
+      background: rgba(27, 143, 90, 0.11);
+      color: var(--success);
+    }
+
+    .status.warning {
+      background: rgba(189, 109, 0, 0.11);
+      color: var(--warning);
+    }
+
+    .status.error {
+      background: rgba(191, 47, 60, 0.12);
+      color: var(--danger);
+    }
+
+    .list-panel {
+      padding-bottom: 14px;
+    }
+
+    textarea {
+      width: 100%;
+      min-height: 252px;
+      resize: vertical;
+      border: 1px solid rgba(27, 34, 48, 0.08);
+      border-radius: 22px;
+      padding: 16px;
+      background: rgba(255, 255, 255, 0.8);
+      color: var(--text);
+      font: 600 0.97rem/1.55 Menlo, Monaco, "SFMono-Regular", monospace;
+      outline: none;
+    }
+
+    textarea::placeholder {
+      color: #8b93a0;
+    }
+
+    .footer-note {
+      margin: 14px 4px 0;
+      color: var(--muted);
+      font-size: 0.86rem;
+      line-height: 1.45;
+    }
+
+    .footer-note strong {
+      color: var(--text);
+    }
+
+    .list-note {
+      margin: 10px 2px 0;
+      color: var(--muted);
+      font-size: 0.84rem;
+      line-height: 1.4;
+    }
+
+    body.camera-fullscreen {
+      overflow: hidden;
+    }
+
+    #cameraPanel.fullscreen {
+      position: fixed;
+      inset: 0;
+      z-index: 1000;
+      margin: 0;
+      padding:
+        calc(var(--safe-top) + 10px)
+        14px
+        calc(var(--safe-bottom) + 14px);
+      border-radius: 0;
+      width: 100vw;
+      height: 100svh;
+      display: flex;
+      flex-direction: column;
+      background: rgba(18, 24, 34, 0.97);
+      border: 0;
+      box-shadow: none;
+    }
+
+    #cameraPanel.fullscreen .panel-title,
+    #cameraPanel.fullscreen .panel-note,
+    #cameraPanel.fullscreen .status {
+      color: #fffdf8;
+    }
+
+    #cameraPanel.fullscreen .panel-note {
+      opacity: 0.78;
+    }
+
+    #cameraPanel.fullscreen .close-camera {
+      display: inline-flex;
+    }
+
+    #cameraPanel.fullscreen .scanner-wrap {
+      flex: 1;
+      min-height: 0;
+      background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.08)),
+        #05070b;
+      border-color: rgba(255, 255, 255, 0.08);
+    }
+
+    #cameraPanel.fullscreen #reader,
+    #cameraPanel.fullscreen #reader video {
+      min-height: 100%;
+      height: 100%;
+      border-radius: 28px;
+    }
+
+    #cameraPanel.fullscreen .status {
+      background: rgba(255, 255, 255, 0.08);
+    }
+
+    #cameraPanel.fullscreen .status.success {
+      background: rgba(27, 143, 90, 0.2);
+      color: #d6ffe9;
+    }
+
+    #cameraPanel.fullscreen .status.warning {
+      background: rgba(189, 109, 0, 0.22);
+      color: #ffe0a6;
+    }
+
+    #cameraPanel.fullscreen .status.error {
+      background: rgba(191, 47, 60, 0.24);
+      color: #ffd8dd;
+    }
+
+    @keyframes rise-in {
+      from {
+        opacity: 0;
+        transform: translateY(14px);
+      }
+
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    @media (max-width: 360px) {
+      .app-shell {
+        padding-inline: 12px;
+      }
+
+      .controls-grid {
+        gap: 10px;
+      }
+
+      button {
+        padding-inline: 10px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="app-shell">
+    <section class="card hero">
+      <div class="hero-topline">
+        <div class="eyebrow">Mobile Web App</div>
+        <div id="versionChip" class="version-chip">Version 4</div>
+      </div>
+      <h1>IMEI Scanner</h1>
+      <p class="subtitle">
+        Scan device barcodes with your iPhone camera and keep a clean, deduplicated list ready to copy.
+      </p>
+      <div class="counter" aria-live="polite">
+        <div>
+          <div class="counter-label">Saved IMEIs</div>
+          <div id="counterValue" class="counter-value">0</div>
+        </div>
+        <div class="counter-unit" id="counterUnit">unique scans</div>
+      </div>
+    </section>
+
+    <section class="card controls">
+      <div class="controls-grid">
+        <button id="startButton" class="primary" type="button">Start camera</button>
+        <button id="stopButton" class="secondary" type="button" disabled>Stop camera</button>
+        <button id="copyButton" class="utility" type="button" disabled>Copy all</button>
+        <button id="clearButton" class="utility" type="button" disabled>Clear list</button>
+        <button id="fullscreenButton" class="utility wide" type="button">Open full camera</button>
+      </div>
+    </section>
+
+    <section id="cameraPanel" class="card panel">
+      <div class="panel-heading">
+        <h2 class="panel-title">Camera</h2>
+        <button id="closeFullscreenButton" class="close-camera" type="button">Close camera</button>
+        <div class="panel-note">Best on HTTPS or GitHub Pages</div>
+      </div>
+      <div class="scanner-wrap">
+        <div id="reader"></div>
+      </div>
+      <div id="status" class="status">Ready. Tap Start camera to scan IMEI barcodes.</div>
+    </section>
+
+    <section class="card panel list-panel">
+      <div class="panel-heading">
+        <h2 class="panel-title">Scanned list</h2>
+        <div class="panel-note">One value per line</div>
+      </div>
+      <textarea
+        id="imeiList"
+        placeholder="Scanned IMEIs will appear here."
+        spellcheck="false"
+        autocapitalize="off"
+        autocomplete="off"
+        autocorrect="off"
+      ></textarea>
+      <p class="list-note">Edit or delete lines directly. Changes save automatically.</p>
+    </section>
+
+    <p class="footer-note">
+      <strong>GitHub Pages:</strong> keep this file as <code>index.html</code>, push the
+      <code>imei-scanner</code> folder to a repo, and enable Pages for the branch or folder you publish.
+    </p>
+  </main>
+
+  <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+  <script>
+    const APP_VERSION = "Version 4";
+    const STORAGE_KEY = "imei-scanner-items";
+
+    const state = {
+      items: [],
+      seen: new Set(),
+      scanner: null,
+      running: false
+    };
+
+    const startButton = document.getElementById("startButton");
+    const stopButton = document.getElementById("stopButton");
+    const copyButton = document.getElementById("copyButton");
+    const clearButton = document.getElementById("clearButton");
+    const fullscreenButton = document.getElementById("fullscreenButton");
+    const closeFullscreenButton = document.getElementById("closeFullscreenButton");
+    const statusElement = document.getElementById("status");
+    const counterValue = document.getElementById("counterValue");
+    const counterUnit = document.getElementById("counterUnit");
+    const imeiList = document.getElementById("imeiList");
+    const cameraPanel = document.getElementById("cameraPanel");
+    const versionChip = document.getElementById("versionChip");
+
+    function normalizeValue(value) {
+      return String(value || "")
+        .trim()
+        .replace(/\s+/g, " ");
+    }
+
+    function rebuildState(items) {
+      const uniqueItems = [];
+      const seen = new Set();
+
+      items.forEach((item) => {
+        const normalized = normalizeValue(item);
+        if (!normalized || seen.has(normalized)) {
+          return;
+        }
+        seen.add(normalized);
+        uniqueItems.push(normalized);
+      });
+
+      state.items = uniqueItems;
+      state.seen = seen;
+    }
+
+    function parseItemsFromText(value) {
+      return String(value || "")
+        .split(/\r?\n/)
+        .map((line) => normalizeValue(line))
+        .filter(Boolean);
+    }
+
+    function saveItems() {
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(state.items));
+      } catch (error) {
+        setStatus("This browser blocked local storage, so scans will only last for this session.", "warning");
+      }
+    }
+
+    function updateListMeta() {
+      counterValue.textContent = String(state.items.length);
+      counterUnit.textContent = state.items.length === 1 ? "unique scan" : "unique scans";
+      copyButton.disabled = state.items.length === 0;
+      clearButton.disabled = state.items.length === 0;
+    }
+
+    function renderList() {
+      imeiList.value = state.items.join("\n");
+      imeiList.scrollTop = imeiList.scrollHeight;
+      updateListMeta();
+    }
+
+    function setStatus(message, tone) {
+      statusElement.textContent = message;
+      statusElement.className = "status" + (tone ? " " + tone : "");
+    }
+
+    function setRunning(isRunning) {
+      state.running = isRunning;
+      startButton.disabled = isRunning;
+      stopButton.disabled = !isRunning;
+    }
+
+    function enterFullscreenCamera() {
+      document.body.classList.add("camera-fullscreen");
+      cameraPanel.classList.add("fullscreen");
+    }
+
+    function exitFullscreenCamera() {
+      document.body.classList.remove("camera-fullscreen");
+      cameraPanel.classList.remove("fullscreen");
+    }
+
+    function syncListFromTextarea(normalizeDisplay) {
+      rebuildState(parseItemsFromText(imeiList.value));
+      saveItems();
+
+      if (normalizeDisplay) {
+        const caretStart = imeiList.selectionStart;
+        const caretEnd = imeiList.selectionEnd;
+        imeiList.value = state.items.join("\n");
+
+        if (typeof caretStart === "number" && typeof caretEnd === "number") {
+          const maxPosition = imeiList.value.length;
+          imeiList.setSelectionRange(
+            Math.min(caretStart, maxPosition),
+            Math.min(caretEnd, maxPosition)
+          );
+        }
+      }
+
+      updateListMeta();
+    }
+
+    function loadItems() {
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        const parsed = raw ? JSON.parse(raw) : [];
+        rebuildState(Array.isArray(parsed) ? parsed : []);
+      } catch (error) {
+        rebuildState([]);
+        setStatus("Saved list could not be loaded, so a fresh list was started.", "warning");
+      }
+      renderList();
+    }
+
+    function vibrateOnScan() {
+      if ("vibrate" in navigator) {
+        navigator.vibrate([80, 30, 80]);
+      }
+    }
+
+    function addScan(value) {
+      const normalized = normalizeValue(value);
+      if (!normalized) {
+        return;
+      }
+
+      if (state.seen.has(normalized)) {
+        setStatus("Duplicate ignored. This IMEI is already in the list.", "warning");
+        return;
+      }
+
+      state.items.push(normalized);
+      state.seen.add(normalized);
+      saveItems();
+      renderList();
+
+      vibrateOnScan();
+
+      setStatus("Added " + normalized + ".", "success");
+    }
+
+    function getAllSupportedFormats() {
+      if (typeof Html5QrcodeSupportedFormats === "undefined") {
+        return null;
+      }
+
+      return [
+        Html5QrcodeSupportedFormats.QR_CODE,
+        Html5QrcodeSupportedFormats.AZTEC,
+        Html5QrcodeSupportedFormats.CODABAR,
+        Html5QrcodeSupportedFormats.CODE_39,
+        Html5QrcodeSupportedFormats.CODE_93,
+        Html5QrcodeSupportedFormats.CODE_128,
+        Html5QrcodeSupportedFormats.DATA_MATRIX,
+        Html5QrcodeSupportedFormats.MAXICODE,
+        Html5QrcodeSupportedFormats.ITF,
+        Html5QrcodeSupportedFormats.EAN_13,
+        Html5QrcodeSupportedFormats.EAN_8,
+        Html5QrcodeSupportedFormats.PDF_417,
+        Html5QrcodeSupportedFormats.RSS_14,
+        Html5QrcodeSupportedFormats.RSS_EXPANDED,
+        Html5QrcodeSupportedFormats.UPC_A,
+        Html5QrcodeSupportedFormats.UPC_E,
+        Html5QrcodeSupportedFormats.UPC_EAN_EXTENSION
+      ].filter(Boolean);
+    }
+
+    function createScannerConfig() {
+      const config = {
+        verbose: false,
+        useBarCodeDetectorIfSupported: false,
+        experimentalFeatures: {
+          useBarCodeDetectorIfSupported: false
+        }
+      };
+
+      const formats = getAllSupportedFormats();
+      if (formats) {
+        config.formatsToSupport = formats;
+      }
+
+      return config;
+    }
+
+    function scoreCameraLabel(label) {
+      const normalized = String(label || "").toLowerCase();
+      let score = 0;
+
+      if (/back|rear|environment/.test(normalized)) {
+        score += 100;
+      }
+
+      if (/wide|1x|main|default/.test(normalized)) {
+        score += 35;
+      }
+
+      if (/ultra|macro|tele|front|selfie|truedepth/.test(normalized)) {
+        score -= 40;
+      }
+
+      return score;
+    }
+
+    function getBarcodeQrbox(viewfinderWidth, viewfinderHeight) {
+      const width = Math.max(220, Math.min(Math.floor(viewfinderWidth * 0.92), 380));
+      const height = Math.max(110, Math.min(Math.floor(viewfinderHeight * 0.22), 170));
+
+      return { width: width, height: height };
+    }
+
+    function isAppleMobileBrowser() {
+      const userAgent = navigator.userAgent || "";
+      const touchMac = navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1;
+
+      return /iphone|ipad|ipod/i.test(userAgent) || touchMac;
+    }
+
+    async function optimizeRunningCameraForBarcode() {
+      if (!state.scanner || !state.running) {
+        return [];
+      }
+
+      try {
+        const capabilities = state.scanner.getRunningTrackCapabilities();
+        const settings = state.scanner.getRunningTrackSettings();
+        const advanced = [];
+        const optimizations = [];
+
+        if (Array.isArray(capabilities.focusMode)) {
+          if (capabilities.focusMode.includes("continuous")) {
+            advanced.push({ focusMode: "continuous" });
+            optimizations.push("continuous focus");
+          } else if (capabilities.focusMode.includes("auto")) {
+            advanced.push({ focusMode: "auto" });
+            optimizations.push("auto focus");
+          }
+        }
+
+        if (capabilities.zoom
+          && typeof capabilities.zoom.min === "number"
+          && typeof capabilities.zoom.max === "number") {
+          const minZoom = capabilities.zoom.min;
+          const maxZoom = capabilities.zoom.max;
+          const currentZoom = typeof settings.zoom === "number" ? settings.zoom : minZoom;
+          const preferredZoom = isAppleMobileBrowser() ? 2 : 1.4;
+          const targetZoom = Math.min(maxZoom, Math.max(minZoom, Math.max(currentZoom, preferredZoom)));
+
+          if (targetZoom > currentZoom + 0.01) {
+            advanced.push({ zoom: targetZoom });
+            optimizations.push(targetZoom.toFixed(1) + "x zoom");
+          }
+        }
+
+        if (advanced.length > 0) {
+          await state.scanner.applyVideoConstraints({ advanced: advanced });
+        }
+
+        return optimizations;
+      } catch (error) {
+        return [];
+      }
+    }
+
+    async function getPreferredCamera() {
+      if (isAppleMobileBrowser()) {
+        return { facingMode: "environment" };
+      }
+
+      try {
+        const cameras = await Html5Qrcode.getCameras();
+        if (Array.isArray(cameras) && cameras.length > 0) {
+          const rankedCameras = cameras
+            .slice()
+            .sort((firstCamera, secondCamera) =>
+              scoreCameraLabel(secondCamera.label) - scoreCameraLabel(firstCamera.label)
+            );
+
+          return rankedCameras[0].id;
+        }
+      } catch (error) {
+        return { facingMode: "environment" };
+      }
+
+      return { facingMode: "environment" };
+    }
+
+    async function startCamera() {
+      if (state.running) {
+        return;
+      }
+
+      if (typeof Html5Qrcode === "undefined") {
+        setStatus("Scanner library failed to load. Check your internet connection and reload.", "error");
+        return;
+      }
+
+      setStatus("Requesting camera access...", "");
+      setRunning(true);
+
+      try {
+        if (!state.scanner) {
+          state.scanner = new Html5Qrcode("reader", createScannerConfig());
+        }
+
+        const camera = await getPreferredCamera();
+        const formats = getAllSupportedFormats();
+
+        const scannerConfig = {
+          fps: 8,
+          disableFlip: true,
+          qrbox: getBarcodeQrbox,
+          rememberLastUsedCamera: true
+        };
+
+        if (formats) {
+          scannerConfig.formatsToSupport = formats;
+        }
+
+        await state.scanner.start(
+          camera,
+          scannerConfig,
+          (decodedText) => {
+            addScan(decodedText);
+          },
+          () => {
+            // Ignore per-frame decode errors while scanning.
+          }
+        );
+
+        const optimizations = await optimizeRunningCameraForBarcode();
+        const optimizationMessage = optimizations.length > 0
+          ? " Camera optimized with " + optimizations.join(" and ") + "."
+          : "";
+
+        setStatus("Camera is live. Line up any barcode in view." + optimizationMessage, "");
+      } catch (error) {
+        setRunning(false);
+        if (state.scanner) {
+          try {
+            await state.scanner.clear();
+          } catch (clearError) {
+            // Ignore cleanup errors.
+          }
+          state.scanner = null;
+        }
+        setStatus(
+          "Camera could not start. Allow camera access and use HTTPS or GitHub Pages on iPhone Safari.",
+          "error"
+        );
+      }
+    }
+
+    async function stopCamera(options) {
+      const settings = options || {};
+      const shouldExitFullscreen = Boolean(settings.exitFullscreen);
+      const message = settings.message || "Camera stopped. Your scanned list is still saved on this device.";
+
+      if (!state.running || !state.scanner) {
+        if (shouldExitFullscreen) {
+          exitFullscreenCamera();
+        }
+        return;
+      }
+
+      try {
+        await state.scanner.stop();
+      } catch (error) {
+        // Ignore stop errors and continue cleanup.
+      }
+
+      try {
+        await state.scanner.clear();
+      } catch (error) {
+        // Ignore clear errors.
+      }
+
+      state.scanner = null;
+      setRunning(false);
+      if (shouldExitFullscreen) {
+        exitFullscreenCamera();
+      }
+      setStatus(message, "");
+    }
+
+    async function openFullscreenCameraView() {
+      enterFullscreenCamera();
+
+      if (state.running) {
+        setStatus("Camera is live. Line up the barcode anywhere in view.", "");
+        return;
+      }
+
+      await startCamera();
+
+      if (!state.running) {
+        exitFullscreenCamera();
+      }
+    }
+
+    async function closeFullscreenCameraView() {
+      if (state.running) {
+        await stopCamera({
+          exitFullscreen: true,
+          message: "Camera closed. Your scanned list is still saved on this device."
+        });
+        return;
+      }
+
+      exitFullscreenCamera();
+      setStatus("Camera closed. Your scanned list is still saved on this device.", "");
+    }
+
+    async function copyAll() {
+      syncListFromTextarea(true);
+
+      if (state.items.length === 0) {
+        setStatus("There is nothing to copy yet.", "warning");
+        return;
+      }
+
+      const text = state.items.join("\n");
+
+      try {
+        await navigator.clipboard.writeText(text);
+        setStatus("Copied " + state.items.length + " IMEI" + (state.items.length === 1 ? "" : "s") + ".", "success");
+      } catch (error) {
+        const wasReadOnly = imeiList.hasAttribute("readonly");
+        imeiList.focus();
+        imeiList.select();
+        imeiList.setSelectionRange(0, imeiList.value.length);
+        const copied = typeof document.execCommand === "function" && document.execCommand("copy");
+
+        if (wasReadOnly) {
+          imeiList.setAttribute("readonly", "readonly");
+        }
+
+        if (copied) {
+          setStatus("Copied " + state.items.length + " IMEI" + (state.items.length === 1 ? "" : "s") + ".", "success");
+        } else {
+          setStatus("Copy failed. Press and hold the list to copy manually.", "error");
+        }
+      }
+    }
+
+    function clearList() {
+      syncListFromTextarea(true);
+
+      if (state.items.length === 0) {
+        return;
+      }
+
+      const confirmed = window.confirm("Clear all saved IMEIs?");
+      if (!confirmed) {
+        return;
+      }
+
+      rebuildState([]);
+      saveItems();
+      renderList();
+      setStatus("List cleared. You can start scanning again.", "");
+    }
+
+    startButton.addEventListener("click", startCamera);
+    stopButton.addEventListener("click", () => {
+      stopCamera({
+        exitFullscreen: cameraPanel.classList.contains("fullscreen")
+      });
+    });
+    copyButton.addEventListener("click", copyAll);
+    clearButton.addEventListener("click", clearList);
+    fullscreenButton.addEventListener("click", openFullscreenCameraView);
+    closeFullscreenButton.addEventListener("click", closeFullscreenCameraView);
+    imeiList.addEventListener("input", () => {
+      syncListFromTextarea(false);
+    });
+    imeiList.addEventListener("blur", () => {
+      syncListFromTextarea(true);
+    });
+
+    window.addEventListener("beforeunload", () => {
+      if (state.running && state.scanner) {
+        state.scanner.stop().catch(() => {});
+      }
+    });
+
+    versionChip.textContent = APP_VERSION;
+    document.title = "IMEI Scanner " + APP_VERSION;
+    loadItems();
+  </script>
+</body>
+</html>
