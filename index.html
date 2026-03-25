@@ -465,11 +465,11 @@
     <section class="card hero">
       <div class="hero-topline">
         <div class="eyebrow">Mobile Web App</div>
-        <div id="versionChip" class="version-chip">Version 5</div>
+        <div id="versionChip" class="version-chip">Version 6</div>
       </div>
       <h1>IMEI Scanner</h1>
       <p class="subtitle">
-        Fast IMEI scanning mode for warehouse and workshop use on iPhone.
+        Full-field barcode scanning with the widest rear camera on iPhone.
       </p>
       <div class="counter" aria-live="polite">
         <div>
@@ -526,12 +526,11 @@
 
   <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
   <script>
-    const APP_VERSION = "Version 5";
+    const APP_VERSION = "Version 6";
     const STORAGE_KEY = "imei-scanner-items";
     const STORAGE_WRITE_DELAY_MS = 180;
-    const SCAN_PAUSE_MS = 160;
     const DUPLICATE_SCAN_COOLDOWN_MS = 900;
-    const FAST_SCAN_FPS = 16;
+    const FAST_SCAN_FPS = 12;
 
     const state = {
       items: [],
@@ -539,9 +538,9 @@
       scanner: null,
       running: false,
       saveTimer: 0,
-      resumeTimer: 0,
       lastDetectedText: "",
-      lastDetectedAt: 0
+      lastDetectedAt: 0,
+      preferredCameraId: ""
     };
 
     const startButton = document.getElementById("startButton");
@@ -703,38 +702,11 @@
       return true;
     }
 
-    function getFastImeiFormats() {
-      if (typeof Html5QrcodeSupportedFormats === "undefined") {
-        return null;
-      }
-
-      return [
-        Html5QrcodeSupportedFormats.CODE_128,
-        Html5QrcodeSupportedFormats.CODE_39,
-        Html5QrcodeSupportedFormats.CODE_93,
-        Html5QrcodeSupportedFormats.ITF,
-        Html5QrcodeSupportedFormats.EAN_13,
-        Html5QrcodeSupportedFormats.EAN_8,
-        Html5QrcodeSupportedFormats.UPC_A,
-        Html5QrcodeSupportedFormats.UPC_E
-      ].filter(Boolean);
-    }
-
     function createScannerConfig() {
-      const config = {
+      return {
         verbose: false,
-        useBarCodeDetectorIfSupported: false,
-        experimentalFeatures: {
-          useBarCodeDetectorIfSupported: false
-        }
+        useBarCodeDetectorIfSupported: false
       };
-
-      const formats = getFastImeiFormats();
-      if (formats) {
-        config.formatsToSupport = formats;
-      }
-
-      return config;
     }
 
     function scoreCameraLabel(label) {
@@ -745,22 +717,19 @@
         score += 100;
       }
 
-      if (/wide|1x|main|default/.test(normalized)) {
-        score += 35;
+      if (/ultra|0\.5|0,5|wide angle|ultrawide/.test(normalized)) {
+        score += 80;
       }
 
-      if (/ultra|macro|tele|front|selfie|truedepth/.test(normalized)) {
-        score -= 40;
+      if (/wide|1x|main|default/.test(normalized)) {
+        score += 30;
+      }
+
+      if (/macro|tele|2x|3x|front|selfie|truedepth/.test(normalized)) {
+        score -= 70;
       }
 
       return score;
-    }
-
-    function getBarcodeQrbox(viewfinderWidth, viewfinderHeight) {
-      const width = Math.max(250, Math.min(Math.floor(viewfinderWidth * 0.9), 390));
-      const height = Math.max(96, Math.min(Math.floor(viewfinderHeight * 0.16), 124));
-
-      return { width: width, height: height };
     }
 
     function isAppleMobileBrowser() {
@@ -778,7 +747,6 @@
       try {
         const capabilities = state.scanner.getRunningTrackCapabilities();
         const settings = state.scanner.getRunningTrackSettings();
-        const constraints = {};
         const advanced = [];
 
         if (Array.isArray(capabilities.focusMode)) {
@@ -787,10 +755,6 @@
           } else if (capabilities.focusMode.includes("auto")) {
             advanced.push({ focusMode: "auto" });
           }
-        }
-
-        if (capabilities.frameRate && typeof capabilities.frameRate.max === "number") {
-          constraints.frameRate = Math.min(30, capabilities.frameRate.max);
         }
 
         if (capabilities.zoom
@@ -806,45 +770,13 @@
         }
 
         if (advanced.length > 0) {
-          constraints.advanced = advanced;
-        }
-
-        if (Object.keys(constraints).length > 0) {
-          await state.scanner.applyVideoConstraints(constraints);
+          await state.scanner.applyVideoConstraints({ advanced: advanced });
         }
 
         return [];
       } catch (error) {
         return [];
       }
-    }
-
-    function pauseScannerBriefly() {
-      if (!state.scanner || !state.running) {
-        return;
-      }
-
-      window.clearTimeout(state.resumeTimer);
-
-      try {
-        state.scanner.pause(false);
-      } catch (error) {
-        return;
-      }
-
-      state.resumeTimer = window.setTimeout(() => {
-        state.resumeTimer = 0;
-
-        if (!state.scanner || !state.running) {
-          return;
-        }
-
-        try {
-          state.scanner.resume();
-        } catch (error) {
-          // Ignore resume errors.
-        }
-      }, SCAN_PAUSE_MS);
     }
 
     function handleScanSuccess(decodedText) {
@@ -863,14 +795,12 @@
       state.lastDetectedText = normalized;
       state.lastDetectedAt = now;
 
-      if (addScan(normalized)) {
-        pauseScannerBriefly();
-      }
+      addScan(normalized);
     }
 
     async function getPreferredCamera() {
-      if (isAppleMobileBrowser()) {
-        return { facingMode: "environment" };
+      if (state.preferredCameraId) {
+        return state.preferredCameraId;
       }
 
       try {
@@ -882,7 +812,8 @@
               scoreCameraLabel(secondCamera.label) - scoreCameraLabel(firstCamera.label)
             );
 
-          return rankedCameras[0].id;
+          state.preferredCameraId = rankedCameras[0].id;
+          return state.preferredCameraId;
         }
       } catch (error) {
         return { facingMode: "environment" };
@@ -910,17 +841,11 @@
         }
 
         const camera = await getPreferredCamera();
-        const formats = getFastImeiFormats();
 
         const scannerConfig = {
           fps: FAST_SCAN_FPS,
-          disableFlip: true,
-          qrbox: getBarcodeQrbox
+          disableFlip: true
         };
-
-        if (formats) {
-          scannerConfig.formatsToSupport = formats;
-        }
 
         await state.scanner.start(
           camera,
@@ -932,7 +857,7 @@
         );
 
         await optimizeRunningCameraForSpeed();
-        setStatus("Camera is live. Fast IMEI mode is ready.", "");
+        setStatus("Camera is live. Full-field scan mode is ready.", "");
       } catch (error) {
         setRunning(false);
         if (state.scanner) {
@@ -954,9 +879,6 @@
       const settings = options || {};
       const shouldExitFullscreen = Boolean(settings.exitFullscreen);
       const message = settings.message || "Camera stopped. Your scanned list is still saved on this device.";
-
-      window.clearTimeout(state.resumeTimer);
-      state.resumeTimer = 0;
       state.lastDetectedText = "";
       state.lastDetectedAt = 0;
 
@@ -1083,7 +1005,6 @@
     });
 
     window.addEventListener("beforeunload", () => {
-      window.clearTimeout(state.resumeTimer);
       window.clearTimeout(state.saveTimer);
       flushItemsToStorage();
       if (state.running && state.scanner) {
