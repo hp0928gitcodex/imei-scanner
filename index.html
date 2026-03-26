@@ -285,6 +285,46 @@
       background: #05070b;
     }
 
+    .scan-target {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      width: var(--target-w, 300px);
+      height: var(--target-h, 160px);
+      border: 4px solid rgba(255, 138, 61, 0.9);
+      border-radius: 24px;
+      box-shadow: 0 0 0 1px rgba(255, 138, 61, 0.26);
+      transform: translate(-50%, -50%);
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 120ms ease, border-color 120ms ease, box-shadow 120ms ease;
+      z-index: 3;
+    }
+
+    .scan-target.is-visible {
+      opacity: 1;
+    }
+
+    .scan-target[data-state="idle"] {
+      border-color: rgba(255, 138, 61, 0.82);
+      box-shadow: 0 0 0 1px rgba(255, 138, 61, 0.26);
+    }
+
+    .scan-target[data-state="scanning"] {
+      border-color: #ff8a3d;
+      box-shadow: 0 0 0 1px rgba(255, 138, 61, 0.38), 0 0 0 8px rgba(255, 138, 61, 0.16);
+    }
+
+    .scan-target[data-state="success"] {
+      border-color: #27c86f;
+      box-shadow: 0 0 0 1px rgba(39, 200, 111, 0.42), 0 0 0 8px rgba(39, 200, 111, 0.18);
+    }
+
+    .scan-target[data-state="error"] {
+      border-color: #ff4e5c;
+      box-shadow: 0 0 0 1px rgba(255, 78, 92, 0.42), 0 0 0 8px rgba(255, 78, 92, 0.18);
+    }
+
     #reader {
       width: 100%;
       min-height: 256px;
@@ -295,6 +335,31 @@
       border-radius: 24px;
       object-fit: contain;
       background: #05070b;
+    }
+
+    .camera-action {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 56px;
+      margin-top: 14px;
+    }
+
+    .camera-scan-button {
+      width: 100%;
+      min-height: 56px;
+      font-size: 1rem;
+      letter-spacing: 0.01em;
+    }
+
+    .camera-scan-button[hidden],
+    #status[hidden] {
+      display: none;
+    }
+
+    .camera-action .status {
+      width: 100%;
+      margin-top: 0;
     }
 
     .status {
@@ -465,11 +530,11 @@
     <section class="card hero">
       <div class="hero-topline">
         <div class="eyebrow">Mobile Web App</div>
-        <div id="versionChip" class="version-chip">Version 8</div>
+        <div id="versionChip" class="version-chip">Version 9</div>
       </div>
       <h1>IMEI Scanner</h1>
       <p class="subtitle">
-        Full camera mode with manual, one-tap scan attempts.
+        Full camera mode with manual scan control and live hitbox feedback.
       </p>
       <div class="counter" aria-live="polite">
         <div>
@@ -482,9 +547,6 @@
 
     <section class="card controls">
       <div class="controls-grid">
-        <button id="startButton" class="primary" type="button">Start camera</button>
-        <button id="scanButton" class="secondary" type="button" disabled>Scan barcode</button>
-        <button id="stopButton" class="secondary" type="button" disabled>Stop camera</button>
         <button id="copyButton" class="utility" type="button" disabled>Copy all</button>
         <button id="clearButton" class="utility" type="button" disabled>Clear list</button>
         <button id="fullscreenButton" class="utility wide" type="button">Open full camera</button>
@@ -497,10 +559,14 @@
         <button id="closeFullscreenButton" class="close-camera" type="button">Close camera</button>
         <div class="panel-note">Best on HTTPS or GitHub Pages</div>
       </div>
-      <div class="scanner-wrap">
+      <div id="scannerWrap" class="scanner-wrap">
         <div id="reader"></div>
+        <div id="scanTarget" class="scan-target" data-state="idle" aria-hidden="true"></div>
       </div>
-      <div id="status" class="status">Ready. Open full camera mode, align the barcode in the box, then tap Scan.</div>
+      <div class="camera-action">
+        <button id="scanButton" class="primary camera-scan-button" type="button" hidden>Scan</button>
+        <div id="status" class="status">Ready. Open full camera mode, align the barcode in the box, then tap Scan.</div>
+      </div>
     </section>
 
     <section class="card panel list-panel">
@@ -527,7 +593,7 @@
 
   <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
   <script>
-    const APP_VERSION = "Version 8";
+    const APP_VERSION = "Version 9";
     const STORAGE_KEY = "imei-scanner-items";
     const STORAGE_WRITE_DELAY_MS = 180;
     const SCAN_ARM_TIMEOUT_MS = 5000;
@@ -547,9 +613,7 @@
       scanTimer: 0
     };
 
-    const startButton = document.getElementById("startButton");
     const scanButton = document.getElementById("scanButton");
-    const stopButton = document.getElementById("stopButton");
     const copyButton = document.getElementById("copyButton");
     const clearButton = document.getElementById("clearButton");
     const fullscreenButton = document.getElementById("fullscreenButton");
@@ -559,6 +623,8 @@
     const counterUnit = document.getElementById("counterUnit");
     const imeiList = document.getElementById("imeiList");
     const cameraPanel = document.getElementById("cameraPanel");
+    const scannerWrap = document.getElementById("scannerWrap");
+    const scanTarget = document.getElementById("scanTarget");
     const versionChip = document.getElementById("versionChip");
 
     function normalizeValue(value) {
@@ -631,31 +697,44 @@
       statusElement.className = "status" + (tone ? " " + tone : "");
     }
 
-    function setRunning(isRunning) {
-      state.running = isRunning;
-      startButton.disabled = isRunning;
-      stopButton.disabled = !isRunning;
-      if (!isRunning) {
-        state.scanArmed = false;
-      }
-      updateScanButton();
+    function setTargetState(nextState) {
+      scanTarget.dataset.state = nextState;
     }
 
-    function updateScanButton() {
-      scanButton.textContent = "Scan barcode";
-      scanButton.disabled = !state.running || !cameraPanel.classList.contains("fullscreen");
+    function updateTargetVisibility() {
+      const isVisible = state.running && cameraPanel.classList.contains("fullscreen");
+      scanTarget.classList.toggle("is-visible", isVisible);
+    }
+
+    function setRunning(isRunning) {
+      state.running = isRunning;
+      fullscreenButton.disabled = isRunning;
+      if (!isRunning) {
+        state.scanArmed = false;
+        setTargetState("idle");
+      }
+      updateCameraActionArea();
+    }
+
+    function updateCameraActionArea() {
+      const canScanHere = state.running && cameraPanel.classList.contains("fullscreen");
+      scanButton.hidden = !canScanHere;
+      scanButton.disabled = !canScanHere || state.scanArmed;
+      scanButton.textContent = state.scanArmed ? "Scanning..." : "Scan";
+      statusElement.hidden = canScanHere;
+      updateTargetVisibility();
     }
 
     function enterFullscreenCamera() {
       document.body.classList.add("camera-fullscreen");
       cameraPanel.classList.add("fullscreen");
-      updateScanButton();
+      updateCameraActionArea();
     }
 
     function exitFullscreenCamera() {
       document.body.classList.remove("camera-fullscreen");
       cameraPanel.classList.remove("fullscreen");
-      updateScanButton();
+      updateCameraActionArea();
     }
 
     function syncListFromTextarea(normalizeDisplay) {
@@ -752,6 +831,9 @@
       const width = Math.max(240, Math.min(Math.floor(viewfinderWidth * 0.82), 360));
       const height = Math.max(120, Math.min(Math.floor(viewfinderHeight * 0.34), 210));
 
+      scannerWrap.style.setProperty("--target-w", width + "px");
+      scannerWrap.style.setProperty("--target-h", height + "px");
+
       return { width: width, height: height };
     }
 
@@ -803,7 +885,7 @@
     function pauseArmedScanning(message, tone) {
       clearScanTimer();
       state.scanArmed = false;
-      updateScanButton();
+      updateCameraActionArea();
 
       if (state.scanner && state.running) {
         try {
@@ -831,16 +913,18 @@
 
       clearScanTimer();
       state.scanArmed = true;
-      updateScanButton();
+      setTargetState("scanning");
+      updateCameraActionArea();
 
       try {
         state.scanner.resume();
       } catch (error) {
-        // Some browsers keep the decoder active even when pause() is ignored.
+          // Some browsers keep the decoder active even when pause() is ignored.
       }
 
       setStatus("Scan attempt started. Hold the barcode inside the box.", "");
       state.scanTimer = window.setTimeout(() => {
+        setTargetState("error");
         pauseArmedScanning("No barcode found. Reposition it inside the box and tap Scan again.", "warning");
       }, SCAN_ARM_TIMEOUT_MS);
     }
@@ -866,11 +950,13 @@
       state.lastDetectedAt = now;
 
       if (state.seen.has(normalized)) {
+        setTargetState("error");
         pauseArmedScanning("Duplicate ignored. Align another barcode and tap Scan again.", "warning");
         return;
       }
 
       addScan(normalized);
+      setTargetState("success");
       pauseArmedScanning();
     }
 
@@ -934,6 +1020,7 @@
         );
 
         await optimizeRunningCameraForSpeed();
+        setTargetState("idle");
         if (cameraPanel.classList.contains("fullscreen")) {
           pauseArmedScanning("Full camera ready. Tap Scan to make one scan attempt.", "");
         } else {
@@ -964,6 +1051,7 @@
       state.lastDetectedText = "";
       state.lastDetectedAt = 0;
       state.scanArmed = false;
+      setTargetState("idle");
 
       if (!state.running || !state.scanner) {
         if (shouldExitFullscreen) {
@@ -1065,18 +1153,12 @@
       }
 
       rebuildState([]);
-      saveItems();
+      flushItemsToStorage();
       renderList();
       setStatus("List cleared. You can start scanning again.", "");
     }
 
-    startButton.addEventListener("click", startCamera);
     scanButton.addEventListener("click", armScanning);
-    stopButton.addEventListener("click", () => {
-      stopCamera({
-        exitFullscreen: cameraPanel.classList.contains("fullscreen")
-      });
-    });
     copyButton.addEventListener("click", copyAll);
     clearButton.addEventListener("click", clearList);
     fullscreenButton.addEventListener("click", openFullscreenCameraView);
@@ -1099,6 +1181,7 @@
 
     versionChip.textContent = APP_VERSION;
     document.title = "IMEI Scanner " + APP_VERSION;
+    updateCameraActionArea();
     loadItems();
   </script>
 </body>
