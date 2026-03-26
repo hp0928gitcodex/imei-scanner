@@ -465,11 +465,11 @@
     <section class="card hero">
       <div class="hero-topline">
         <div class="eyebrow">Mobile Web App</div>
-        <div id="versionChip" class="version-chip">Version 7</div>
+        <div id="versionChip" class="version-chip">Version 8</div>
       </div>
       <h1>IMEI Scanner</h1>
       <p class="subtitle">
-        Controlled barcode scanning with a visible hitbox and manual scan trigger.
+        Full camera mode with manual, one-tap scan attempts.
       </p>
       <div class="counter" aria-live="polite">
         <div>
@@ -500,7 +500,7 @@
       <div class="scanner-wrap">
         <div id="reader"></div>
       </div>
-      <div id="status" class="status">Ready. Tap Start camera, align the barcode in the box, then tap Scan.</div>
+      <div id="status" class="status">Ready. Open full camera mode, align the barcode in the box, then tap Scan.</div>
     </section>
 
     <section class="card panel list-panel">
@@ -527,7 +527,7 @@
 
   <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
   <script>
-    const APP_VERSION = "Version 7";
+    const APP_VERSION = "Version 8";
     const STORAGE_KEY = "imei-scanner-items";
     const STORAGE_WRITE_DELAY_MS = 180;
     const SCAN_ARM_TIMEOUT_MS = 5000;
@@ -634,7 +634,6 @@
     function setRunning(isRunning) {
       state.running = isRunning;
       startButton.disabled = isRunning;
-      scanButton.disabled = !isRunning;
       stopButton.disabled = !isRunning;
       if (!isRunning) {
         state.scanArmed = false;
@@ -643,17 +642,20 @@
     }
 
     function updateScanButton() {
-      scanButton.textContent = state.scanArmed ? "Cancel scan" : "Scan barcode";
+      scanButton.textContent = "Scan barcode";
+      scanButton.disabled = !state.running || !cameraPanel.classList.contains("fullscreen");
     }
 
     function enterFullscreenCamera() {
       document.body.classList.add("camera-fullscreen");
       cameraPanel.classList.add("fullscreen");
+      updateScanButton();
     }
 
     function exitFullscreenCamera() {
       document.body.classList.remove("camera-fullscreen");
       cameraPanel.classList.remove("fullscreen");
+      updateScanButton();
     }
 
     function syncListFromTextarea(normalizeDisplay) {
@@ -822,11 +824,12 @@
         return;
       }
 
-      if (state.scanArmed) {
-        pauseArmedScanning("Scan cancelled.", "");
+      if (!cameraPanel.classList.contains("fullscreen")) {
+        setStatus("Open full camera mode to scan.", "warning");
         return;
       }
 
+      clearScanTimer();
       state.scanArmed = true;
       updateScanButton();
 
@@ -836,7 +839,7 @@
         // Some browsers keep the decoder active even when pause() is ignored.
       }
 
-      setStatus("Scanning inside the box. Hold steady until one barcode is captured.", "");
+      setStatus("Scan attempt started. Hold the barcode inside the box.", "");
       state.scanTimer = window.setTimeout(() => {
         pauseArmedScanning("No barcode found. Reposition it inside the box and tap Scan again.", "warning");
       }, SCAN_ARM_TIMEOUT_MS);
@@ -931,7 +934,11 @@
         );
 
         await optimizeRunningCameraForSpeed();
-        pauseArmedScanning("Camera is live. Align a barcode inside the box and tap Scan.", "");
+        if (cameraPanel.classList.contains("fullscreen")) {
+          pauseArmedScanning("Full camera ready. Tap Scan to make one scan attempt.", "");
+        } else {
+          pauseArmedScanning("Preview mode only. Open full camera to enable scanning.", "");
+        }
       } catch (error) {
         setRunning(false);
         if (state.scanner) {
@@ -989,7 +996,7 @@
       enterFullscreenCamera();
 
       if (state.running) {
-        setStatus("Camera is live. Align a barcode inside the box and tap Scan.", "");
+        setStatus("Full camera ready. Tap Scan to make one scan attempt.", "");
         return;
       }
 
